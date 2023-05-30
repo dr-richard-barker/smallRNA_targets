@@ -1,0 +1,65 @@
+Here's a python script that first installs the required Biopython and pandas libraries if they are not already installed. 
+The script then reads the input .csv file containing the names and sequences of small interfering microRNAs.
+It performs a BLAST search against the human genome, and saves the results in an output .csv file. 
+The output file contains the name, sequence, hit ID, hit definition, hit start, hit end, and e-value for each potential hit site. 
+Additional comments have been added to the script to provide better understanding of each step.
+
+
+```python
+# Install required libraries
+import sys
+!{sys.executable} -m pip install biopython pandas
+
+# Import required libraries
+import csv
+import tempfile
+from Bio.Blast import NCBIWWW, NCBIXML
+import pandas as pd
+
+# Read input .csv file
+input_file = "input.csv"
+data = pd.read_csv(input_file)
+
+# Prepare output .csv file
+output_file = "output.csv"
+output_data = []
+
+# Function to perform BLAST search
+def blast_sequence(sequence):
+    # Create a temporary fasta file with the sequence
+    with tempfile.NamedTemporaryFile(mode="w") as temp_fasta:
+        temp_fasta.write(f">query\n{sequence}\n")
+        temp_fasta.flush()
+
+        # Perform BLAST search using the temporary fasta file
+        result_handle = NCBIWWW.qblast("blastn", "nt", temp_fasta.name)
+        blast_records = NCBIXML.parse(result_handle)
+        return blast_records
+
+# Iterate through input data and perform BLAST search
+for index, row in data.iterrows():
+    name = row["name"]
+    sequence = row["sequence"]
+    print(f"Processing {name}...")
+    blast_records = blast_sequence(sequence)
+
+    # Extract relevant information from BLAST results
+    for blast_record in blast_records:
+        for alignment in blast_record.alignments:
+            for hsp in alignment.hsps:
+                output_data.append({
+                    "name": name,
+                    "sequence": sequence,
+                    "hit_id": alignment.hit_id,
+                    "hit_def": alignment.hit_def,
+                    "hit_start": hsp.sbjct_start,
+                    "hit_end": hsp.sbjct_end,
+                    "e_value": hsp.expect
+                })
+
+# Save output data to .csv file
+output_df = pd.DataFrame(output_data)
+output_df.to_csv(output_file, index=False)
+print(f"Results saved to {output_file}")
+```
+
